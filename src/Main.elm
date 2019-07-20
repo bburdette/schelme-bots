@@ -74,7 +74,7 @@ type RightPanelView
 
 
 type DialogCommand
-    = DialogCommand SSD.Command
+    = SSDCommand SSD.Command
 
 
 type alias Model =
@@ -606,7 +606,17 @@ update msg model =
                         ( ndlg, dcmd ) =
                             dlg (Dialog.Msg (DMsg ssdmsg))
                     in
-                    ( { model | dialogs = ndlg :: cdr model.dialogs }, Cmd.none )
+                    case dcmd of
+                        SSDCommand sc ->
+                            case sc of
+                                SSD.None ->
+                                    ( { model | dialogs = ndlg :: cdr model.dialogs }, Cmd.none )
+
+                                SSD.Canceled ->
+                                    ( { model | dialogs = cdr model.dialogs }, Cmd.none )
+
+                                SSD.Selected name ->
+                                    ( { model | dialogs = cdr model.dialogs }, mkPublicHttpReq model.location (PI.GetScript name) )
 
                 Just (Rendering _) ->
                     ( model, Cmd.none )
@@ -649,7 +659,7 @@ update msg model =
                                     SSD.Noop
                         )
                         DMsg
-                        DialogCommand
+                        SSDCommand
             in
             ( { model
                 | dialogs =
