@@ -740,12 +740,13 @@ update msg model =
                                     { model
                                         | bots =
                                             defaultBotPositions botSpawnRadius <|
-                                                A.push
-                                                    { emptyBot
+                                                A.fromList
+                                                    ({ emptyBot
                                                         | name = name
                                                         , programText = script
-                                                    }
-                                                    model.bots
+                                                     }
+                                                        :: A.toList model.bots
+                                                    )
                                     }
                             in
                             ( nmodel
