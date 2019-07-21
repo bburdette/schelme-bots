@@ -24,7 +24,6 @@ import Prelude as Prelude
 import PublicInterface as PI
 import Random
 import Random.List as RL
-import SelectString2 as SelectString
 import SelectStringDialog as SSD
 import Show exposing (showTerm)
 import Url exposing (Url)
@@ -89,7 +88,6 @@ type alias Model =
     , showPreludeFtns : Bool
     , showBotFtns : Bool
     , location : String
-    , infront : Maybe (Element Msg)
     , dialogs : List (Dialog Msg DialogCommand)
     , serverbots : List String
     , saveHover : Maybe Int
@@ -238,7 +236,6 @@ init flags url key =
       , showBotFtns = True
       , location = flags.location
       , serverbots = []
-      , infront = Nothing
       , dialogs = []
       , saveHover = Nothing
       }
@@ -625,16 +622,6 @@ update msg model =
                     ( model, Cmd.none )
 
         GetBot ->
-            {-
-               ( { model
-                   | infront =
-                       Just <|
-                           infrontDialog CancelBotSelect <|
-                               SelectString.view "Select a Bot" model.serverbots SelectBot CancelBotSelect
-                 }
-               , Cmd.none
-               )
-            -}
             let
                 sdlg : Dialog SSD.Msg SSD.Command
                 sdlg =
@@ -669,7 +656,7 @@ update msg model =
             )
 
         CancelBotSelect ->
-            ( { model | infront = Nothing }, Cmd.none )
+            ( { model | dialogs = cdr model.dialogs }, Cmd.none )
 
         SelectBot name ->
             ( model, mkPublicHttpReq model.location (PI.GetScript name) )
