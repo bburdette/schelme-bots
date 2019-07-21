@@ -6,6 +6,7 @@ import BotLang exposing (Bot, BotControl(..), allreference, botSpawnRadius, botr
 import Browser exposing (UrlRequest)
 import Browser.Events as BE
 import Browser.Navigation as BN exposing (Key)
+import Dialog exposing (Dialog(..))
 import Dict exposing (Dict)
 import Element exposing (..)
 import Element.Background as BG
@@ -21,7 +22,7 @@ import Prelude as Prelude
 import PublicInterface as PI
 import Random
 import Random.List as RL
-import SelectString
+import SelectStringDialog as SSD
 import Show exposing (showTerm)
 import Url exposing (Url)
 
@@ -45,7 +46,6 @@ type Msg
     | DeleteBot Int
     | GetBot
     | SaveBot Int
-    | SelectBot String
     | CancelBotSelect
     | Stop
     | AniFrame Float
@@ -61,11 +61,16 @@ type Msg
     | ServerResponse (Result Http.Error PI.ServerResponse)
     | LocalVal { what : String, name : String, mbval : Maybe String }
     | SaveHover (Maybe Int)
+    | DMsg SSD.Msg
 
 
 type RightPanelView
     = Game
     | CommandGlossary
+
+
+type DialogCommand
+    = SSDCommand SSD.Command
 
 
 type alias Model =
@@ -80,7 +85,7 @@ type alias Model =
     , showPreludeFtns : Bool
     , showBotFtns : Bool
     , location : String
-    , infront : Maybe (Element Msg)
+    , dialogs : List (Dialog Msg DialogCommand)
     , serverbots : List String
     , saveHover : Maybe Int
     }
@@ -228,7 +233,7 @@ init flags url key =
       , showBotFtns = True
       , location = flags.location
       , serverbots = []
-      , infront = Nothing
+      , dialogs = []
       , saveHover = Nothing
       }
     , Cmd.batch
@@ -432,6 +437,16 @@ viewGlossary model =
                 (Dict.toList ref)
 
 
+cdr : List a -> List a
+cdr lst =
+    case List.tail lst of
+        Just l ->
+            l
+
+        Nothing ->
+            []
+
+
 view : Model -> Element Msg
 view model =
     row [ width fill, height fill ] <|
@@ -578,21 +593,67 @@ update msg model =
             , storeBots nmodel
             )
 
+        DMsg ssdmsg ->
+            case List.head model.dialogs of
+                Just (Dialog dlg) ->
+                    let
+                        ( ndlg, dcmd ) =
+                            dlg (Dialog.Msg msg)
+                    in
+                    case dcmd of
+                        SSDCommand sc ->
+                            case sc of
+                                SSD.None ->
+                                    ( { model | dialogs = ndlg :: cdr model.dialogs }, Cmd.none )
+
+                                SSD.Canceled ->
+                                    ( { model | dialogs = cdr model.dialogs }, Cmd.none )
+
+                                SSD.Selected name ->
+                                    ( { model | dialogs = cdr model.dialogs }, mkPublicHttpReq model.location (PI.GetScript name) )
+
+                Just (Rendering _) ->
+                    ( model, Cmd.none )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
         GetBot ->
+            let
+                sdlg : Dialog SSD.Msg SSD.Command
+                sdlg =
+                    Dialog
+                        (SSD.ssDialog
+                            { title = "Select a Bot"
+                            , choices = model.serverbots
+                            , selected = Nothing
+                            }
+                        )
+
+                dlg : Dialog Msg DialogCommand
+                dlg =
+                    Dialog.duMap
+                        sdlg
+                        (\ms ->
+                            case ms of
+                                DMsg m ->
+                                    m
+
+                                _ ->
+                                    SSD.Noop
+                        )
+                        DMsg
+                        SSDCommand
+            in
             ( { model
-                | infront =
-                    Just <|
-                        infrontDialog CancelBotSelect <|
-                            SelectString.view "Select a Bot" model.serverbots SelectBot CancelBotSelect
+                | dialogs =
+                    dlg :: model.dialogs
               }
             , Cmd.none
             )
 
         CancelBotSelect ->
-            ( { model | infront = Nothing }, Cmd.none )
-
-        SelectBot name ->
-            ( model, mkPublicHttpReq model.location (PI.GetScript name) )
+            ( { model | dialogs = cdr model.dialogs }, Cmd.none )
 
         SaveBot idx ->
             case A.get idx model.bots of
@@ -660,12 +721,13 @@ update msg model =
                                     { model
                                         | bots =
                                             defaultBotPositions botSpawnRadius <|
-                                                A.push
-                                                    { emptyBot
+                                                A.fromList
+                                                    ({ emptyBot
                                                         | name = name
                                                         , programText = script
-                                                    }
-                                                    model.bots
+                                                     }
+                                                        :: A.toList model.bots
+                                                    )
                                     }
                             in
                             ( nmodel
@@ -699,8 +761,16 @@ main =
                 { title = "schelme bots"
                 , body =
                     [ layout
-                        (model.infront
-                            |> Maybe.map (\x -> [ inFront x ])
+                        (List.head model.dialogs
+                            |> Maybe.andThen Dialog.render
+                            |> Maybe.map
+                                (\x ->
+                                    [ inFront
+                                        (infrontDialog CancelBotSelect <|
+                                            x
+                                        )
+                                    ]
+                                )
                             |> Maybe.withDefault []
                         )
                       <|
