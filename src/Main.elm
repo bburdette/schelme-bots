@@ -46,7 +46,6 @@ type Msg
     | DeleteBot Int
     | GetBot
     | SaveBot Int
-    | SelectBot String
     | CancelBotSelect
     | Stop
     | AniFrame Float
@@ -599,7 +598,7 @@ update msg model =
                 Just (Dialog dlg) ->
                     let
                         ( ndlg, dcmd ) =
-                            dlg (Dialog.Msg (DMsg ssdmsg))
+                            dlg (Dialog.Msg msg)
                     in
                     case dcmd of
                         SSDCommand sc ->
@@ -655,9 +654,6 @@ update msg model =
 
         CancelBotSelect ->
             ( { model | dialogs = cdr model.dialogs }, Cmd.none )
-
-        SelectBot name ->
-            ( model, mkPublicHttpReq model.location (PI.GetScript name) )
 
         SaveBot idx ->
             case A.get idx model.bots of
