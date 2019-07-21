@@ -18,8 +18,6 @@ import EvalStep exposing (EvalBodyStep(..), NameSpace, Term(..))
 import Html.Attributes as HA
 import Http
 import Json.Encode as JE
-import ParseHelp exposing (listOf)
-import Parser as P exposing ((|.), (|=))
 import Prelude as Prelude
 import PublicInterface as PI
 import Random
