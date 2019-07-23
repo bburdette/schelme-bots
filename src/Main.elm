@@ -278,7 +278,10 @@ viewNamespace ns =
     column [ width fill ] <|
         List.map
             (\( name, term ) ->
-                row [ width fill, spacing 7 ] [ el [ width fill ] <| text name, el [ width fill ] <| text <| showTerm term ]
+                row [ width fill, spacing 7 ]
+                    [ el [ width fill ] <| text name
+                    , el [ width fill ] <| text <| showTerm term
+                    ]
             )
             (Dict.toList ns)
 
@@ -293,7 +296,7 @@ viewBot showCode prints savehover idx bot =
         [ row [ width fill, spacing 7 ]
             [ el [ Font.bold ] <| text <| "Bot " ++ String.fromInt idx
             , el [ width (px 25), height (px 25), BG.color (rgb r g b) ] <| text "    "
-            , EI.text [ width fill, height (maximum 500 shrink), alignTop ]
+            , EI.text [ width fill, alignTop ]
                 { onChange = NameChanged idx
                 , text = bot.name
                 , placeholder = Nothing
@@ -349,7 +352,7 @@ viewBot showCode prints savehover idx bot =
 
             Ok _ ->
                 none
-        , paragraph [] [ botStatus bot.step ]
+        , paragraph [ width fill ] [ botStatus bot.step ]
         ]
             ++ [ column [ scrollbarY, height <| maximum 130 shrink, width fill ] <|
                     List.map text (Maybe.withDefault [] (Dict.get idx prints))
