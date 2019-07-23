@@ -283,21 +283,6 @@ viewNamespace ns =
             (Dict.toList ns)
 
 
-workAroundMultiLine :
-    List (Attribute msg)
-    ->
-        { onChange : String -> msg
-        , text : String
-        , placeholder : Maybe (EI.Placeholder msg)
-        , label : EI.Label msg
-        , spellcheck : Bool
-        }
-    -> Element msg
-workAroundMultiLine attribs mlspec =
-    EI.multiline (htmlAttribute (HA.property "value" (JE.string mlspec.text)) :: attribs)
-        mlspec
-
-
 viewBot : Bool -> Dict Int (List String) -> Bool -> Int -> Bot -> Element Msg
 viewBot showCode prints savehover idx bot =
     let
@@ -348,7 +333,7 @@ viewBot showCode prints savehover idx bot =
                 }
             ]
         , if showCode then
-            workAroundMultiLine [ width fill, height (maximum 500 shrink), alignTop ]
+            EI.multiline [ width fill, height (maximum 500 shrink), alignTop ]
                 { onChange = ProgramTextChanged idx
                 , text = bot.programText
                 , placeholder = Nothing
@@ -449,8 +434,8 @@ cdr lst =
 
 view : Model -> Element Msg
 view model =
-    row [ width fill, height fill ] <|
-        [ column [ width fill, alignTop, height fill, scrollbarY ] <|
+    row [ width fill ] <|
+        [ column [ width fill, alignTop, scrollbarY ] <|
             row [ width fill, spacing 5 ]
                 [ EI.button buttonStyle
                     { onPress = Just GetBot
