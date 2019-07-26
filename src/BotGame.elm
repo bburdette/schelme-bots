@@ -1,4 +1,4 @@
-module BotGame exposing (applyBotPositions, arena, assignBotPositions, botColors, botPositions, collide, collideArray, collideD2, colorString, defaultBotPositions, drawBot, drawBots, emptyBot, gameStep, getBotColor, isDead, toSvgXY, unDead, updateElt, velCollide)
+module BotGame exposing (BotDist, BotDistDict, aBotDist, applyBotPositions, arena, assignBotPositions, botColors, botDist, botPositions, collide, collideArray, collideD2, colorString, defaultBotPositions, distDict, drawBot, drawBots, emptyBot, gameStep, getBddDist, getBotColor, isDead, testBots, toSvgXY, unDead, updateElt, velCollide)
 
 import Array as A exposing (Array)
 import BotLang exposing (Bot, BotControl(..), Vec, botPixelRad, botRadius, botlang, vecPlus)
@@ -33,6 +33,13 @@ emptyBot =
     , accel = ( 0, 0 )
     , dead = False
     }
+
+
+testBots : Array Bot
+testBots =
+    A.fromList <|
+        List.map (\pos -> { emptyBot | position = pos })
+            [ ( 0, 0 ), ( 1, 1 ), ( 0, 1 ), ( 1, 0 ) ]
 
 
 botColors : Array BotLang.Color
@@ -176,16 +183,21 @@ toSvgXY ( x, y ) =
     ( x * 250 + 250, y * 250 + 250 )
 
 
-
--- assume we calc the distance between all bots.  What's a good way to store the results
--- so they're usable?
--- map of maps?
--- Dict BotId (Dict BotId Float)
--- redundant data but I guess fast.
--- compute
+type alias BotDist =
+    { d2 : Float
+    , d : Float
+    }
 
 
-distDict : Array Bot -> Dict ( Int, Int ) BotDist
+type alias BotDistDict =
+    Dict ( Int, Int ) BotDist
+
+
+{-| an dict of (idx1, idx2) -> botdist, where (idx1 < idx2).
+if a distance isn't there then either its an invalid bot index, or one or
+both of the bots are dead.
+-}
+distDict : Array Bot -> BotDistDict
 distDict bots =
     let
         cm1 =
@@ -199,7 +211,7 @@ distDict bots =
                         ( Just b1, Just b2 ) ->
                             case botDist b1 b2 of
                                 Just bd ->
-                                    Dict.insert ( i1, i1 ) bd bots2
+                                    Dict.insert ( i1, i2 ) bd bots2
 
                                 Nothing ->
                                     bots2
@@ -214,20 +226,10 @@ distDict bots =
         (List.range 0 (cm1 - 1))
 
 
-type alias BotDist =
-    { dx : Float
-    , dy : Float
-    , d2 : Float
-    , d : Float
-    }
-
-
-type alias BotDistDict =
-    Dict ( Int, Int ) (Maybe BotDist)
-
-
-getBotDist : Int -> Int -> Array Bot -> BotDistDict -> ( Maybe BotDist, BotDistDict )
-getBotDist bid1 bid2 bots bdd =
+{-| 'Nothing' indicates either invalid bot range, or one or both bots are dead
+-}
+getBddDist : Int -> Int -> BotDistDict -> Maybe BotDist
+getBddDist bid1 bid2 bdd =
     let
         bp =
             if bid1 <= bid2 then
@@ -236,16 +238,7 @@ getBotDist bid1 bid2 bots bdd =
             else
                 ( bid2, bid1 )
     in
-    case Dict.get bp bdd of
-        Just d ->
-            ( d, bdd )
-
-        Nothing ->
-            let
-                bd =
-                    aBotDist (Tuple.first bp) (Tuple.second bp) bots
-            in
-            ( bd, Dict.insert bp bd bdd )
+    Dict.get bp bdd
 
 
 aBotDist : Int -> Int -> Array Bot -> Maybe BotDist
@@ -281,9 +274,7 @@ botDist b1 b2 =
                 dx * dx + dy * dy
         in
         Just
-            { dx = dx
-            , dy = dy
-            , d2 = d2
+            { d2 = d2
             , d = sqrt d2
             }
 
