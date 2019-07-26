@@ -1,7 +1,7 @@
-module BotGame exposing (BotDist, BotDistDict, aBotDist, applyBotPositions, arena, assignBotPositions, botColors, botDist, botPositions, collide, collideArray, collideD2, colorString, defaultBotPositions, distDict, drawBot, drawBots, emptyBot, gameStep, getBddDist, getBotColor, isDead, testBots, toSvgXY, unDead, updateElt, velCollide)
+module BotGame exposing (applyBotPositions, arena, assignBotPositions, botColors, botPixelRad, botPositions, botRadius, botSpawnRadius, collide, collideArray, collideD2, colorString, defaultBotPositions, drawBot, drawBots, emptyBot, gameStep, getBotColor, isDead, testBots, toSvgXY, unDead, updateElt, velCollide)
 
 import Array as A exposing (Array)
-import BotLang exposing (Bot, BotControl(..), Vec, botPixelRad, botRadius, botlang, vecPlus)
+import BotLang exposing (Bot, BotControl(..), BotDist, BotDistDict, Vec, botlang, distDict, getBddDist, vecPlus)
 import Dict exposing (Dict)
 import Element exposing (..)
 import EvalStep exposing (EvalBodyStep(..), Term(..))
@@ -10,6 +10,21 @@ import StateGet
 import StateSet
 import Svg as S exposing (Svg)
 import Svg.Attributes as SA
+
+
+botRadius : Float
+botRadius =
+    0.1
+
+
+botSpawnRadius : Float
+botSpawnRadius =
+    0.5
+
+
+botPixelRad : String
+botPixelRad =
+    String.fromInt <| round <| 250 * botRadius
 
 
 updateElt : Int -> (a -> a) -> Array a -> Array a
@@ -183,104 +198,8 @@ toSvgXY ( x, y ) =
     ( x * 250 + 250, y * 250 + 250 )
 
 
-type alias BotDist =
-    { d2 : Float
-    , d : Float
-    }
-
-
-type alias BotDistDict =
-    Dict ( Int, Int ) BotDist
-
-
-{-| an dict of (idx1, idx2) -> botdist, where (idx1 < idx2).
-if a distance isn't there then either its an invalid bot index, or one or
-both of the bots are dead.
--}
-distDict : Array Bot -> BotDistDict
-distDict bots =
-    let
-        cm1 =
-            A.length bots - 1
-    in
-    List.foldr
-        (\i1 bd1 ->
-            List.foldr
-                (\i2 bots2 ->
-                    case ( A.get i1 bots, A.get i2 bots ) of
-                        ( Just b1, Just b2 ) ->
-                            case botDist b1 b2 of
-                                Just bd ->
-                                    Dict.insert ( i1, i2 ) bd bots2
-
-                                Nothing ->
-                                    bots2
-
-                        _ ->
-                            bots2
-                )
-                bd1
-                (List.range (i1 + 1) cm1)
-        )
-        Dict.empty
-        (List.range 0 (cm1 - 1))
-
-
-{-| 'Nothing' indicates either invalid bot range, or one or both bots are dead
--}
-getBddDist : Int -> Int -> BotDistDict -> Maybe BotDist
-getBddDist bid1 bid2 bdd =
-    let
-        bp =
-            if bid1 <= bid2 then
-                ( bid1, bid2 )
-
-            else
-                ( bid2, bid1 )
-    in
-    Dict.get bp bdd
-
-
-aBotDist : Int -> Int -> Array Bot -> Maybe BotDist
-aBotDist b1 b2 bots =
-    case ( A.get b1 bots, A.get b2 bots ) of
-        ( Just bot1, Just bot2 ) ->
-            botDist bot1 bot2
-
-        _ ->
-            Nothing
-
-
-botDist : Bot -> Bot -> Maybe BotDist
-botDist b1 b2 =
-    if b1.dead || b2.dead then
-        Nothing
-
-    else
-        let
-            ( x1, y1 ) =
-                b1.position
-
-            ( x2, y2 ) =
-                b2.position
-
-            dx =
-                x2 - x1
-
-            dy =
-                y2 - y1
-
-            d2 =
-                dx * dx + dy * dy
-        in
-        Just
-            { d2 = d2
-            , d = sqrt d2
-            }
-
-
-collideArray : Array Bot -> Array Bot
-collideArray bots =
+collideArray : BotDistDict -> Array Bot -> Array Bot
+collideArray bdd bots =
     let
         cm1 =
             A.length bots - 1
@@ -289,9 +208,9 @@ collideArray bots =
         (\i1 bots1 ->
             List.foldr
                 (\i2 bots2 ->
-                    case ( A.get i1 bots2, A.get i2 bots2 ) of
-                        ( Just b1, Just b2 ) ->
-                            case collide b1 b2 of
+                    case ( getBddDist i1 i2 bdd, A.get i1 bots2, A.get i2 bots2 ) of
+                        ( Just bd, Just b1, Just b2 ) ->
+                            case collide bd b1 b2 of
                                 Just ( c1, c2 ) ->
                                     bots2
                                         |> A.set i1 c1
@@ -315,8 +234,39 @@ collideD2 =
     (2 * botRadius) ^ 2
 
 
-collide : Bot -> Bot -> Maybe ( Bot, Bot )
-collide b1 b2 =
+collide : BotDist -> Bot -> Bot -> Maybe ( Bot, Bot )
+collide bd b1 b2 =
+    if bd.d2 > collideD2 then
+        Nothing
+
+    else
+        let
+            ( x1, y1 ) =
+                b1.position
+
+            ( x2, y2 ) =
+                b2.position
+
+            dx =
+                x2 - x1
+
+            dy =
+                y2 - y1
+
+            ux =
+                dx / bd.d
+
+            uy =
+                dy / bd.d
+
+            ( v1, v2 ) =
+                velCollide ( b1.velocity, b2.velocity ) ( ux, uy )
+        in
+        Just ( { b1 | velocity = v1 }, { b2 | velocity = v2 } )
+
+
+ocollide : Bot -> Bot -> Maybe ( Bot, Bot )
+ocollide b1 b2 =
     if b1.dead || b2.dead then
         Just ( b1, b2 )
 
@@ -411,7 +361,7 @@ gameStep :
 gameStep model millis =
     let
         botControl =
-            BotControl { botidx = 0, bots = model.bots, prints = model.prints }
+            BotControl { botidx = 0, bots = model.bots, bdd = distDict model.bots, prints = model.prints }
 
         -- run all bots scripts, with botcontrol as the state.
         (BotControl nbc) =
@@ -478,9 +428,13 @@ gameStep model millis =
                         }
                 )
                 nbc.bots
+
+        -- calc distance dict
+        bdd =
+            BotLang.distDict nbots
     in
     { model
-        | bots = collideArray nbots
+        | bots = collideArray bdd nbots
         , prints = nbc.prints
     }
 
@@ -491,6 +445,7 @@ assignBotPositions :
         , prints : Dict Int (List String)
         , go : Bool
     }
+    -> BotDistDict
     -> List ( Float, Float )
     ->
         { model
@@ -498,7 +453,7 @@ assignBotPositions :
             , prints : Dict Int (List String)
             , go : Bool
         }
-assignBotPositions model ps =
+assignBotPositions model bdd ps =
     let
         compiledBots =
             A.indexedMap
@@ -515,6 +470,7 @@ assignBotPositions model ps =
                                             (BotControl
                                                 { botidx = idx
                                                 , bots = model.bots
+                                                , bdd = bdd
                                                 , prints = Dict.empty
                                                 }
                                             )
