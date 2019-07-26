@@ -266,48 +266,6 @@ collide bd b1 b2 =
         Just ( { b1 | velocity = v1 }, { b2 | velocity = v2 } )
 
 
-ocollide : Bot -> Bot -> Maybe ( Bot, Bot )
-ocollide b1 b2 =
-    if b1.dead || b2.dead then
-        Just ( b1, b2 )
-
-    else
-        let
-            ( x1, y1 ) =
-                b1.position
-
-            ( x2, y2 ) =
-                b2.position
-
-            dx =
-                x2 - x1
-
-            dy =
-                y2 - y1
-
-            d2 =
-                dx * dx + dy * dy
-        in
-        if d2 > collideD2 then
-            Nothing
-
-        else
-            let
-                d =
-                    sqrt d2
-
-                ux =
-                    dx / d
-
-                uy =
-                    dy / d
-
-                ( v1, v2 ) =
-                    velCollide ( b1.velocity, b2.velocity ) ( ux, uy )
-            in
-            Just ( { b1 | velocity = v1 }, { b2 | velocity = v2 } )
-
-
 velCollide : ( Vec, Vec ) -> Vec -> ( Vec, Vec )
 velCollide ( ( v1x, v1y ), ( v2x, v2y ) ) ( ux, uy ) =
     let
