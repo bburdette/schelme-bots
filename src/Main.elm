@@ -574,7 +574,11 @@ update msg model =
         AddBot ->
             let
                 nmodel =
-                    { model | bots = defaultBotPositions botSpawnRadius <| A.push emptyBot model.bots }
+                    { model
+                        | bots =
+                            defaultBotPositions botSpawnRadius <|
+                                A.fromList (emptyBot :: A.toList model.bots)
+                    }
             in
             ( nmodel
             , storeBots nmodel

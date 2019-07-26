@@ -1,4 +1,4 @@
-module Bot exposing (Bot, BotControl(..), BotDist, BotDistDict, Color, Vec, aBotDist, botDist, distDict, getBddDist, vecPlus)
+module Bot exposing (Bot, BotControl(..), BotDist, BotDistDict, Color, Vec, aBotDist, botDist, closestBots, distDict, getBddDist, vecPlus)
 
 import Array as A exposing (Array)
 import Dict exposing (Dict)
@@ -133,3 +133,11 @@ getBddDist bdd bid1 bid2 =
                 ( bid2, bid1 )
     in
     Dict.get bp bdd
+
+
+{-| return a list of the bots as (index, distance), closest bots first.
+-}
+closestBots : BotDistDict -> Int -> Int -> List ( Int, Float )
+closestBots bdd idx count =
+    List.filterMap (\idx2 -> getBddDist bdd idx idx2 |> Maybe.map (\d -> ( idx2, d.d ))) (List.range 0 (count - 1))
+        |> List.sortBy Tuple.second

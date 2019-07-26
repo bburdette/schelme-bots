@@ -13,6 +13,7 @@ botftns =
         |> Dict.insert "print" (TSideEffector (evalArgsSideEffector print))
         |> Dict.insert "setThrust" (TSideEffector (evalArgsSideEffector setThrust))
         |> Dict.insert "opponentCount" (TBuiltIn (evalArgsBuiltIn opponentCount))
+        |> Dict.insert "getBotDistances" (TBuiltIn (evalArgsBuiltIn getBotDistances))
         |> Dict.insert "getPosition" (TBuiltIn (evalArgsBuiltIn getPosition))
         |> Dict.insert "myPosition" (TBuiltIn (evalArgsBuiltIn myPosition))
         |> Dict.insert "getVelocity" (TBuiltIn (evalArgsBuiltIn getVelocity))
@@ -38,6 +39,11 @@ botreference =
             (GlossaryEntry
                 "(opponentCount) -> <number>"
                 "returns the number of live opponents"
+            )
+        |> Dict.insert "getBotDistances"
+            (GlossaryEntry
+                "(getBotDistances) -> list (<num index>, <num distance>)"
+                "return a list of bot indexes and distances, with closest bots first"
             )
         |> Dict.insert "getPosition"
             (GlossaryEntry
@@ -156,7 +162,21 @@ getOpIdx robot rqidx count =
         Just i
 
 
-{-| if a bot is dead, returns (list)
+getBotDistances : Prelude.BuiltInFn BotControl
+getBotDistances ns (BotControl bc) argterms =
+    case argterms of
+        [] ->
+            let
+                bdists =
+                    Bot.closestBots bc.bdd bc.botidx (A.length bc.bots)
+            in
+            Ok ( ns, TList (List.map (\( a, b ) -> TList [ TNumber (toFloat a), TNumber b ]) bdists) )
+
+        _ ->
+            Err (String.concat ("getBotDistances takes 0 arguments!  " :: List.map showTerm argterms))
+
+
+{-| returns a list of bot indexes in order of proximity.
 -}
 getPosition : Prelude.BuiltInFn BotControl
 getPosition ns (BotControl bc) argterms =
