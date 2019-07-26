@@ -168,7 +168,16 @@ getBotDistances ns (BotControl bc) argterms =
         [] ->
             let
                 bdists =
-                    Bot.closestBots bc.bdd bc.botidx (A.length bc.bots)
+                    List.map
+                        (\( idx, dist ) ->
+                            if idx <= bc.botidx then
+                                ( idx, dist )
+
+                            else
+                                ( idx - 1, dist )
+                        )
+                    <|
+                        Bot.closestBots bc.bdd bc.botidx (A.length bc.bots)
             in
             Ok ( ns, TList (List.map (\( a, b ) -> TList [ TNumber (toFloat a), TNumber b ]) bdists) )
 
