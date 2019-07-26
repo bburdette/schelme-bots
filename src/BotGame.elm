@@ -1,7 +1,8 @@
 module BotGame exposing (applyBotPositions, arena, assignBotPositions, botColors, botPixelRad, botPositions, botRadius, botSpawnRadius, collide, collideArray, collideD2, colorString, defaultBotPositions, drawBot, drawBots, emptyBot, gameStep, getBotColor, isDead, testBots, toSvgXY, unDead, updateElt, velCollide)
 
 import Array as A exposing (Array)
-import BotLang exposing (Bot, BotControl(..), BotDist, BotDistDict, Vec, botlang, distDict, getBddDist, vecPlus)
+import Bot exposing (Bot, BotControl(..), BotDist, BotDistDict, Color, Vec, aBotDist, botDist, distDict, getBddDist, vecPlus)
+import BotLang exposing (botlang)
 import Dict exposing (Dict)
 import Element exposing (..)
 import EvalStep exposing (EvalBodyStep(..), Term(..))
@@ -57,7 +58,7 @@ testBots =
             [ ( 0, 0 ), ( 1, 1 ), ( 0, 1 ), ( 1, 0 ) ]
 
 
-botColors : Array BotLang.Color
+botColors : Array Bot.Color
 botColors =
     A.fromList
         [ ( 1, 0, 0 )
@@ -72,7 +73,7 @@ botColors =
         ]
 
 
-colorString : BotLang.Color -> String
+colorString : Bot.Color -> String
 colorString ( r, g, b ) =
     let
         ts =
@@ -106,7 +107,7 @@ botPositions radius count =
                 (List.range 0 (nz - 1))
 
 
-getBotColor : Int -> BotLang.Color
+getBotColor : Int -> Bot.Color
 getBotColor idx =
     Maybe.withDefault ( 0, 0, 0 ) <| A.get (modBy (A.length botColors) idx) botColors
 
@@ -208,7 +209,7 @@ collideArray bdd bots =
         (\i1 bots1 ->
             List.foldr
                 (\i2 bots2 ->
-                    case ( getBddDist i1 i2 bdd, A.get i1 bots2, A.get i2 bots2 ) of
+                    case ( getBddDist bdd i1 i2, A.get i1 bots2, A.get i2 bots2 ) of
                         ( Just bd, Just b1, Just b2 ) ->
                             case collide bd b1 b2 of
                                 Just ( c1, c2 ) ->
@@ -431,7 +432,7 @@ gameStep model millis =
 
         -- calc distance dict
         bdd =
-            BotLang.distDict nbots
+            distDict nbots
     in
     { model
         | bots = collideArray bdd nbots

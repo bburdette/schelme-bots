@@ -1,8 +1,9 @@
 port module Main exposing (main)
 
 import Array as A exposing (Array)
+import Bot exposing (Bot, BotControl)
 import BotGame exposing (..)
-import BotLang exposing (Bot, BotControl(..), allreference, botreference)
+import BotLang exposing (allreference, botreference)
 import Browser exposing (UrlRequest)
 import Browser.Events as BE
 import Browser.Navigation as BN exposing (Key)
@@ -689,7 +690,7 @@ update msg model =
             )
 
         RandomBPs ps ->
-            ( assignBotPositions model (BotLang.distDict model.bots) ps
+            ( assignBotPositions model (Bot.distDict model.bots) ps
             , Cmd.none
             )
 
