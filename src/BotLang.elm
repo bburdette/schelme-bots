@@ -1,65 +1,20 @@
-module BotLang exposing (Bot, BotControl(..), Color, Vec, allreference, botPixelRad, botRadius, botSpawnRadius, botftns, botlang, botreference, fromPolar, getOpIdx, getPosition, getVelocity, myPosition, myVelocity, opponentCount, print, setThrust, toPolar, vecPlus)
+module BotLang exposing (allreference, botftns, botlang, botreference, fromOpponentIndex, fromPolar, getBotDistances, getPosition, getVelocity, myPosition, myVelocity, opponentCount, print, setThrust, toOpponentIdx, toPolar)
 
-import Array as A exposing (Array)
-import Dict exposing (Dict)
+import Array as A
+import Bot exposing (BotControl(..))
+import Dict
 import EvalStep exposing (EvalBodyStep(..), GlossaryEntry, NameSpace, Term(..), TermGlossary)
 import Prelude as Prelude exposing (BuiltInFn, evalArgsBuiltIn, evalArgsSideEffector)
 import Show exposing (showTerm, showTerms)
 
 
-type alias Color =
-    ( Float, Float, Float )
-
-
-type alias Vec =
-    ( Float, Float )
-
-
-vecPlus : Vec -> Vec -> Vec
-vecPlus ( x1, y1 ) ( x2, y2 ) =
-    ( x1 + x2, y1 + y2 )
-
-
-type alias Bot =
-    { programText : String
-    , name : String
-    , program : Result String (List (Term BotControl))
-    , step : EvalBodyStep BotControl
-    , position : Vec
-    , velocity : Vec
-    , accel : Vec
-    , dead : Bool
-    }
-
-
-botRadius : Float
-botRadius =
-    0.1
-
-
-botSpawnRadius : Float
-botSpawnRadius =
-    0.5
-
-
-botPixelRad : String
-botPixelRad =
-    String.fromInt <| round <| 250 * botRadius
-
-
-type BotControl
-    = BotControl
-        { botidx : Int
-        , bots : Array Bot
-        , prints : Dict Int (List String)
-        }
-
-
+botftns : NameSpace BotControl
 botftns =
     Dict.empty
         |> Dict.insert "print" (TSideEffector (evalArgsSideEffector print))
         |> Dict.insert "setThrust" (TSideEffector (evalArgsSideEffector setThrust))
         |> Dict.insert "opponentCount" (TBuiltIn (evalArgsBuiltIn opponentCount))
+        |> Dict.insert "getBotDistances" (TBuiltIn (evalArgsBuiltIn getBotDistances))
         |> Dict.insert "getPosition" (TBuiltIn (evalArgsBuiltIn getPosition))
         |> Dict.insert "myPosition" (TBuiltIn (evalArgsBuiltIn myPosition))
         |> Dict.insert "getVelocity" (TBuiltIn (evalArgsBuiltIn getVelocity))
@@ -85,6 +40,11 @@ botreference =
             (GlossaryEntry
                 "(opponentCount) -> <number>"
                 "returns the number of live opponents"
+            )
+        |> Dict.insert "getBotDistances"
+            (GlossaryEntry
+                "(getBotDistances) -> list (<num index>, <num distance>)"
+                "return a list of bot indexes and distances, with closest bots first"
             )
         |> Dict.insert "getPosition"
             (GlossaryEntry
@@ -118,12 +78,14 @@ botreference =
             )
 
 
+allreference : TermGlossary
 allreference =
     botreference
         |> Dict.union Prelude.preludeGlossary
         |> Dict.union Prelude.mathGlossary
 
 
+botlang : NameSpace BotControl
 botlang =
     Prelude.prelude
         |> Dict.union Prelude.math
@@ -146,11 +108,10 @@ fromPolar ns _ terms =
      y / -x    |      y / x
                |
                |
-   -----------------------------
+   ---------------------------
                |
                |
     -y / -x    |     -y / x
-               |
                |
 -}
 
@@ -190,8 +151,35 @@ opponentCount ns (BotControl bc) argterms =
             Err (String.concat ("opponentCount takes 0 arguments!  " :: List.map showTerm argterms))
 
 
-getOpIdx : Int -> Int -> Int -> Maybe Int
-getOpIdx robot rqidx count =
+{-| in robot language, opponent index 0 is the robot's index + 1, and goes up to
+count - 1. This is so all scripts don't target the same bot if they specify bot 0.
+
+0 1 2 3 4 5 'actual' index in Array Bot
+....r
+3 4 x 0 1 2 indexes used by bot script.
+
+0 1 2 3 4 5 6 'actual' index in Array Bot
+....r
+4 5 x 0 1 2 3 indexes used by bot script.
+
+-}
+toOpponentIdx : Int -> Int -> Int -> Maybe Int
+toOpponentIdx robotidx actualidx count =
+    case compare robotidx actualidx of
+        LT ->
+            Just <| (actualidx - robotidx - 1)
+
+        EQ ->
+            Nothing
+
+        GT ->
+            Just <| actualidx + (count - robotidx - 1)
+
+
+{-| convert from opponent index to elm array index
+-}
+fromOpponentIndex : Int -> Int -> Int -> Maybe Int
+fromOpponentIndex robot rqidx count =
     let
         i =
             modBy count (1 + rqidx + robot)
@@ -203,7 +191,27 @@ getOpIdx robot rqidx count =
         Just i
 
 
-{-| if a bot is dead, returns (list)
+getBotDistances : Prelude.BuiltInFn BotControl
+getBotDistances ns (BotControl bc) argterms =
+    case argterms of
+        [] ->
+            let
+                bdists =
+                    List.filterMap
+                        (\( idx, dist ) ->
+                            toOpponentIdx bc.botidx idx (A.length bc.bots)
+                                |> Maybe.map (\i -> ( i, dist ))
+                        )
+                    <|
+                        Bot.closestBots bc.bdd bc.botidx (A.length bc.bots)
+            in
+            Ok ( ns, TList (List.map (\( a, b ) -> TList [ TNumber (toFloat a), TNumber b ]) bdists) )
+
+        _ ->
+            Err (String.concat ("getBotDistances takes 0 arguments!  " :: List.map showTerm argterms))
+
+
+{-| returns a list of bot indexes in order of proximity.
 -}
 getPosition : Prelude.BuiltInFn BotControl
 getPosition ns (BotControl bc) argterms =
@@ -211,7 +219,7 @@ getPosition ns (BotControl bc) argterms =
         [ TNumber idx ] ->
             let
                 opidx =
-                    getOpIdx bc.botidx (round idx) (A.length bc.bots)
+                    fromOpponentIndex bc.botidx (round idx) (A.length bc.bots)
             in
             case opidx |> Maybe.andThen (\oi -> A.get oi bc.bots) of
                 Just bot ->
@@ -264,7 +272,7 @@ getVelocity ns (BotControl bc) argterms =
         [ TNumber idx ] ->
             let
                 opidx =
-                    getOpIdx bc.botidx (round idx) (A.length bc.bots)
+                    fromOpponentIndex bc.botidx (round idx) (A.length bc.bots)
             in
             case opidx |> Maybe.andThen (\oi -> A.get oi bc.bots) of
                 Just bot ->
@@ -302,10 +310,6 @@ setThrust ns (BotControl bc) argterms =
 
 print : Prelude.SideEffectorFn BotControl
 print ns (BotControl bc) argterms =
-    {- let
-       _ = Debug.log ("bot " ++ String.fromInt bc.botidx ++ " printed: ") <| showTerms argterms
-           in
-    -}
     Ok
         ( ns
         , BotControl

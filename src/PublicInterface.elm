@@ -14,6 +14,7 @@ type ServerResponse
     = ServerError String
     | ScriptReceived String String
     | ScriptListReceived (List String)
+    | ScriptWritten String
 
 
 encodeSendMsg : SendMsg -> JE.Value
@@ -39,8 +40,6 @@ encodeSendMsg sm =
         GetScriptList ->
             JE.object
                 [ ( "what", JE.string "getscriptlist" )
-
-                --              , ( "data", JE.string name )
                 ]
 
 
@@ -62,6 +61,11 @@ serverResponseDecoder =
                             (JD.map ScriptListReceived
                                 (JD.list JD.string)
                             )
+
+                    "script written!" ->
+                        JD.field "content" <|
+                            JD.map ScriptWritten
+                                JD.string
 
                     wat ->
                         JD.succeed

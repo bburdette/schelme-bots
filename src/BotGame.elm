@@ -1,7 +1,8 @@
-module BotGame exposing (applyBotPositions, arena, assignBotPositions, botColors, botPositions, collide, collideArray, collideD2, colorString, defaultBotPositions, drawBot, drawBots, emptyBot, gameStep, getBotColor, isDead, toSvgXY, unDead, updateElt, velCollide)
+module BotGame exposing (applyBotPositions, arena, assignBotPositions, botColors, botPixelRad, botPositions, botRadius, botSpawnRadius, collide, collideArray, collideD2, colorString, defaultBotPositions, drawBot, drawBots, emptyBot, gameStep, getBotColor, isDead, testBots, toSvgXY, unDead, updateElt, velCollide)
 
 import Array as A exposing (Array)
-import BotLang exposing (Bot, BotControl(..), Vec, botPixelRad, botRadius, botlang, vecPlus)
+import Bot exposing (Bot, BotControl(..), BotDist, BotDistDict, Color, Vec, aBotDist, botDist, distDict, getBddDist, vecPlus)
+import BotLang exposing (botlang)
 import Dict exposing (Dict)
 import Element exposing (..)
 import EvalStep exposing (EvalBodyStep(..), Term(..))
@@ -10,6 +11,21 @@ import StateGet
 import StateSet
 import Svg as S exposing (Svg)
 import Svg.Attributes as SA
+
+
+botRadius : Float
+botRadius =
+    0.1
+
+
+botSpawnRadius : Float
+botSpawnRadius =
+    0.5
+
+
+botPixelRad : String
+botPixelRad =
+    String.fromInt <| round <| 250 * botRadius
 
 
 updateElt : Int -> (a -> a) -> Array a -> Array a
@@ -35,7 +51,14 @@ emptyBot =
     }
 
 
-botColors : Array BotLang.Color
+testBots : Array Bot
+testBots =
+    A.fromList <|
+        List.map (\pos -> { emptyBot | position = pos })
+            [ ( 0, 0 ), ( 1, 1 ), ( 0, 1 ), ( 1, 0 ) ]
+
+
+botColors : Array Bot.Color
 botColors =
     A.fromList
         [ ( 1, 0, 0 )
@@ -50,7 +73,7 @@ botColors =
         ]
 
 
-colorString : BotLang.Color -> String
+colorString : Bot.Color -> String
 colorString ( r, g, b ) =
     let
         ts =
@@ -84,7 +107,7 @@ botPositions radius count =
                 (List.range 0 (nz - 1))
 
 
-getBotColor : Int -> BotLang.Color
+getBotColor : Int -> Bot.Color
 getBotColor idx =
     Maybe.withDefault ( 0, 0, 0 ) <| A.get (modBy (A.length botColors) idx) botColors
 
@@ -176,8 +199,8 @@ toSvgXY ( x, y ) =
     ( x * 250 + 250, y * 250 + 250 )
 
 
-collideArray : Array Bot -> Array Bot
-collideArray bots =
+collideArray : BotDistDict -> Array Bot -> Array Bot
+collideArray bdd bots =
     let
         cm1 =
             A.length bots - 1
@@ -186,9 +209,9 @@ collideArray bots =
         (\i1 bots1 ->
             List.foldr
                 (\i2 bots2 ->
-                    case ( A.get i1 bots2, A.get i2 bots2 ) of
-                        ( Just b1, Just b2 ) ->
-                            case collide b1 b2 of
+                    case ( getBddDist bdd i1 i2, A.get i1 bots2, A.get i2 bots2 ) of
+                        ( Just bd, Just b1, Just b2 ) ->
+                            case collide bd b1 b2 of
                                 Just ( c1, c2 ) ->
                                     bots2
                                         |> A.set i1 c1
@@ -212,10 +235,10 @@ collideD2 =
     (2 * botRadius) ^ 2
 
 
-collide : Bot -> Bot -> Maybe ( Bot, Bot )
-collide b1 b2 =
-    if b1.dead || b2.dead then
-        Just ( b1, b2 )
+collide : BotDist -> Bot -> Bot -> Maybe ( Bot, Bot )
+collide bd b1 b2 =
+    if bd.d2 > collideD2 then
+        Nothing
 
     else
         let
@@ -231,27 +254,16 @@ collide b1 b2 =
             dy =
                 y2 - y1
 
-            d2 =
-                dx * dx + dy * dy
+            ux =
+                dx / bd.d
+
+            uy =
+                dy / bd.d
+
+            ( v1, v2 ) =
+                velCollide ( b1.velocity, b2.velocity ) ( ux, uy )
         in
-        if d2 > collideD2 then
-            Nothing
-
-        else
-            let
-                d =
-                    sqrt d2
-
-                ux =
-                    dx / d
-
-                uy =
-                    dy / d
-
-                ( v1, v2 ) =
-                    velCollide ( b1.velocity, b2.velocity ) ( ux, uy )
-            in
-            Just ( { b1 | velocity = v1 }, { b2 | velocity = v2 } )
+        Just ( { b1 | velocity = v1 }, { b2 | velocity = v2 } )
 
 
 velCollide : ( Vec, Vec ) -> Vec -> ( Vec, Vec )
@@ -308,7 +320,7 @@ gameStep :
 gameStep model millis =
     let
         botControl =
-            BotControl { botidx = 0, bots = model.bots, prints = model.prints }
+            BotControl { botidx = 0, bots = model.bots, bdd = distDict model.bots, prints = model.prints }
 
         -- run all bots scripts, with botcontrol as the state.
         (BotControl nbc) =
@@ -375,9 +387,13 @@ gameStep model millis =
                         }
                 )
                 nbc.bots
+
+        -- calc distance dict
+        bdd =
+            distDict nbots
     in
     { model
-        | bots = collideArray nbots
+        | bots = collideArray bdd nbots
         , prints = nbc.prints
     }
 
@@ -388,6 +404,7 @@ assignBotPositions :
         , prints : Dict Int (List String)
         , go : Bool
     }
+    -> BotDistDict
     -> List ( Float, Float )
     ->
         { model
@@ -395,7 +412,7 @@ assignBotPositions :
             , prints : Dict Int (List String)
             , go : Bool
         }
-assignBotPositions model ps =
+assignBotPositions model bdd ps =
     let
         compiledBots =
             A.indexedMap
@@ -412,6 +429,7 @@ assignBotPositions model ps =
                                             (BotControl
                                                 { botidx = idx
                                                 , bots = model.bots
+                                                , bdd = bdd
                                                 , prints = Dict.empty
                                                 }
                                             )
