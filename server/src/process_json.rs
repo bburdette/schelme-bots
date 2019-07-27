@@ -2,7 +2,6 @@ extern crate serde_json;
 use failure;
 use failure::Error;
 use serde_json::Value;
-// use std::fs::File;
 use std::fs;
 use std::io::Read;
 use std::path::Path;
@@ -79,7 +78,7 @@ fn save_script(name: &str, script: &str) -> Result<ServerResponse, Error> {
 
       Ok(ServerResponse {
         what: "script written!".to_string(),
-        content: serde_json::Value::Null,
+        content: serde_json::to_value(edname)?,
       })
     }
   }
