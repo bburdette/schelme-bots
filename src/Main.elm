@@ -626,9 +626,6 @@ update msg model =
 
                         OKCommand oc ->
                             case oc of
-                                OK.Canceled ->
-                                    ( { model | dialogs = cdr model.dialogs }, Cmd.none )
-
                                 OK.Okayed ->
                                     ( { model | dialogs = cdr model.dialogs }, Cmd.none )
 

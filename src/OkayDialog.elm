@@ -22,9 +22,6 @@ okayDialog model dmsg =
                         Okay ->
                             Okayed
 
-                        Cancel ->
-                            Canceled
-
                         Noop ->
                             None
             in
@@ -45,14 +42,12 @@ type alias Model =
 
 
 type Command
-    = Canceled
-    | Okayed
+    = Okayed
     | None
 
 
 type Msg
     = Okay
-    | Cancel
     | Noop
 
 
@@ -62,18 +57,12 @@ view model =
         bs =
             List.map (Element.mapAttribute (always Noop))
                 model.buttonStyle
-
-        -- Element.map (always Noop) model.buttonStyle
     in
-    column [ BG.color <| rgb 1 1 1 ]
-        [ el [ Font.bold ] <| text model.title
-        , text model.message
-        , EI.button (alignLeft :: bs)
+    column [ BG.color <| rgb 1 1 1, spacing 10 ]
+        [ el [ Font.bold, centerX ] <| text model.title
+        , el [ centerX ] <| text <| "\"" ++ model.message ++ "\""
+        , EI.button (centerX :: bs)
             { onPress = Just <| Okay
             , label = text "Ok"
-            }
-        , EI.button (alignRight :: bs)
-            { onPress = Just <| Cancel
-            , label = text "Cancel"
             }
         ]
