@@ -60,7 +60,8 @@ view : Model -> Element Msg
 view model =
     let
         bs =
-            []
+            List.map (Element.mapAttribute (always Noop))
+                model.buttonStyle
 
         -- Element.map (always Noop) model.buttonStyle
     in
