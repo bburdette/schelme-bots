@@ -19,6 +19,7 @@ import EvalStep exposing (EvalBodyStep(..), NameSpace, Term(..))
 import Html.Attributes as HA
 import Http
 import Json.Encode as JE
+import OkayDialog as OK
 import Prelude as Prelude
 import PublicInterface as PI
 import Random
@@ -62,7 +63,7 @@ type Msg
     | ServerResponse (Result Http.Error PI.ServerResponse)
     | LocalVal { what : String, name : String, mbval : Maybe String }
     | SaveHover (Maybe Int)
-    | DMsg SSD.Msg
+    | DMsg DialogMessage
 
 
 type RightPanelView
@@ -70,8 +71,14 @@ type RightPanelView
     | CommandGlossary
 
 
+type DialogMessage
+    = SSDMessage SSD.Msg
+    | OKMessage OK.Msg
+
+
 type DialogCommand
     = SSDCommand SSD.Command
+    | OKCommand OK.Command
 
 
 type alias Model =
@@ -202,7 +209,7 @@ restoreReceived name val model =
                 ( model, Cmd.none )
 
 
-buttonStyle : List (Element.Attribute Msg)
+buttonStyle : List (Element.Attribute msg)
 buttonStyle =
     [ BG.color <| rgb255 52 101 164
     , Font.color <| rgb 1 1 1
@@ -598,7 +605,7 @@ update msg model =
             , storeBots nmodel
             )
 
-        DMsg ssdmsg ->
+        DMsg dmsg ->
             case List.head model.dialogs of
                 Just (Dialog dlg) ->
                     let
@@ -616,6 +623,14 @@ update msg model =
 
                                 SSD.Selected name ->
                                     ( { model | dialogs = cdr model.dialogs }, mkPublicHttpReq model.location (PI.GetScript name) )
+
+                        OKCommand oc ->
+                            case oc of
+                                OK.Okayed ->
+                                    ( { model | dialogs = cdr model.dialogs }, Cmd.none )
+
+                                OK.None ->
+                                    ( { model | dialogs = ndlg :: cdr model.dialogs }, Cmd.none )
 
                 Just (Rendering _) ->
                     ( model, Cmd.none )
@@ -641,13 +656,13 @@ update msg model =
                         sdlg
                         (\ms ->
                             case ms of
-                                DMsg m ->
+                                DMsg (SSDMessage m) ->
                                     m
 
                                 _ ->
                                     SSD.Noop
                         )
-                        DMsg
+                        (DMsg << SSDMessage)
                         SSDCommand
             in
             ( { model
@@ -741,6 +756,38 @@ update msg model =
 
                         PI.ScriptListReceived scriptnames ->
                             ( { model | serverbots = scriptnames }, Cmd.none )
+
+                        PI.ScriptWritten name ->
+                            let
+                                okd =
+                                    Dialog <|
+                                        OK.okayDialog
+                                            { title = "script published to server!"
+                                            , message = name
+                                            , buttonStyle = buttonStyle
+                                            }
+
+                                dlg =
+                                    Dialog.duMap
+                                        okd
+                                        (\ms ->
+                                            case ms of
+                                                DMsg (OKMessage m) ->
+                                                    m
+
+                                                _ ->
+                                                    OK.Noop
+                                        )
+                                        (DMsg << OKMessage)
+                                        OKCommand
+                            in
+                            ( { model
+                                | dialogs =
+                                    dlg
+                                        :: model.dialogs
+                              }
+                            , mkPublicHttpReq model.location PI.GetScriptList
+                            )
 
                 Err e ->
                     ( model, Cmd.none )
