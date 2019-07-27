@@ -3,8 +3,6 @@ module OkayDialog exposing (Command(..), Model, Msg(..), okayDialog)
 import Dialog exposing (DMsg(..), Dialog(..))
 import Element exposing (..)
 import Element.Background as BG
-import Element.Border as Border
-import Element.Events as EE
 import Element.Font as Font
 import Element.Input as EI
 
@@ -26,12 +24,6 @@ okayDialog model dmsg =
                             None
             in
             ( Dialog (okayDialog model), cmd )
-
-
-
-{- dialog/pane displaying a list of strings and allowing the user to select one and
-   click ok, or dismiss by canceling or clicking outside the pane.
--}
 
 
 type alias Model =

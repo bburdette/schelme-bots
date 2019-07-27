@@ -729,7 +729,7 @@ update msg model =
             ( { model | showPreludeFtns = v }, Cmd.none )
 
         ServerResponse srr ->
-            case Debug.log "srr" srr of
+            case srr of
                 Ok sr ->
                     case sr of
                         PI.ServerError error ->
@@ -759,9 +759,6 @@ update msg model =
 
                         PI.ScriptWritten name ->
                             let
-                                _ =
-                                    Debug.log "scfriptwrtten" name
-
                                 okd =
                                     Dialog <|
                                         OK.okayDialog
@@ -789,7 +786,7 @@ update msg model =
                                     dlg
                                         :: model.dialogs
                               }
-                            , Cmd.none
+                            , mkPublicHttpReq model.location PI.GetScriptList
                             )
 
                 Err e ->

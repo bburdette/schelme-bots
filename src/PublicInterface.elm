@@ -40,8 +40,6 @@ encodeSendMsg sm =
         GetScriptList ->
             JE.object
                 [ ( "what", JE.string "getscriptlist" )
-
-                --              , ( "data", JE.string name )
                 ]
 
 
