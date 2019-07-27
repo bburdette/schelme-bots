@@ -1,8 +1,9 @@
 port module Main exposing (main)
 
 import Array as A exposing (Array)
+import Bot exposing (Bot, BotControl)
 import BotGame exposing (..)
-import BotLang exposing (Bot, BotControl(..), allreference, botSpawnRadius, botreference)
+import BotLang exposing (allreference, botreference)
 import Browser exposing (UrlRequest)
 import Browser.Events as BE
 import Browser.Navigation as BN exposing (Key)
@@ -573,7 +574,11 @@ update msg model =
         AddBot ->
             let
                 nmodel =
-                    { model | bots = defaultBotPositions botSpawnRadius <| A.push emptyBot model.bots }
+                    { model
+                        | bots =
+                            defaultBotPositions botSpawnRadius <|
+                                A.fromList (emptyBot :: A.toList model.bots)
+                    }
             in
             ( nmodel
             , storeBots nmodel
@@ -689,7 +694,7 @@ update msg model =
             )
 
         RandomBPs ps ->
-            ( assignBotPositions model ps
+            ( assignBotPositions model (Bot.distDict model.bots) ps
             , Cmd.none
             )
 
