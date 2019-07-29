@@ -48,7 +48,7 @@ type Msg
     | DeleteBot Int
     | GetBot
     | SaveBot Int
-    | CancelBotSelect
+    | CancelTopDialog
     | Stop
     | AniFrame Float
     | Sumo Bool
@@ -660,7 +660,7 @@ update msg model =
             , Cmd.none
             )
 
-        CancelBotSelect ->
+        CancelTopDialog ->
             ( { model | dialogs = cdr model.dialogs }, Cmd.none )
 
         SaveBot idx ->
@@ -806,7 +806,7 @@ main =
                             |> Maybe.map
                                 (\x ->
                                     [ inFront
-                                        (infrontDialog CancelBotSelect <|
+                                        (infrontDialog CancelTopDialog <|
                                             x
                                         )
                                     ]
