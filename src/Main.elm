@@ -48,7 +48,7 @@ type Msg
     | DeleteBot Int
     | GetBot
     | SaveBot Int
-    | CancelBotSelect
+    | CancelTopDialog
     | Stop
     | AniFrame Float
     | Sumo Bool
@@ -286,24 +286,12 @@ viewNamespace ns =
     column [ width fill ] <|
         List.map
             (\( name, term ) ->
-                row [ width fill, spacing 7 ] [ el [ width fill ] <| text name, el [ width fill ] <| text <| showTerm term ]
+                row [ width fill, spacing 7 ]
+                    [ el [ width fill ] <| text name
+                    , el [ width fill ] <| text <| showTerm term
+                    ]
             )
             (Dict.toList ns)
-
-
-workAroundMultiLine :
-    List (Attribute msg)
-    ->
-        { onChange : String -> msg
-        , text : String
-        , placeholder : Maybe (EI.Placeholder msg)
-        , label : EI.Label msg
-        , spellcheck : Bool
-        }
-    -> Element msg
-workAroundMultiLine attribs mlspec =
-    EI.multiline (htmlAttribute (HA.property "value" (JE.string mlspec.text)) :: attribs)
-        mlspec
 
 
 viewBot : Bool -> Dict Int (List String) -> Bool -> Int -> Bot -> Element Msg
@@ -316,7 +304,7 @@ viewBot showCode prints savehover idx bot =
         [ row [ width fill, spacing 7 ]
             [ el [ Font.bold ] <| text <| "Bot " ++ String.fromInt idx
             , el [ width (px 25), height (px 25), BG.color (rgb r g b) ] <| text "    "
-            , EI.text [ width fill, height (maximum 500 shrink), alignTop ]
+            , EI.text [ width fill, alignTop ]
                 { onChange = NameChanged idx
                 , text = bot.name
                 , placeholder = Nothing
@@ -356,7 +344,7 @@ viewBot showCode prints savehover idx bot =
                 }
             ]
         , if showCode then
-            workAroundMultiLine [ width fill, height (maximum 500 shrink), alignTop ]
+            EI.multiline [ width fill, height (maximum 500 shrink), alignTop ]
                 { onChange = ProgramTextChanged idx
                 , text = bot.programText
                 , placeholder = Nothing
@@ -372,7 +360,7 @@ viewBot showCode prints savehover idx bot =
 
             Ok _ ->
                 none
-        , paragraph [] [ botStatus bot.step ]
+        , paragraph [ width fill ] [ botStatus bot.step ]
         ]
             ++ [ column [ scrollbarY, height <| maximum 130 shrink, width fill ] <|
                     List.map text (Maybe.withDefault [] (Dict.get idx prints))
@@ -457,8 +445,8 @@ cdr lst =
 
 view : Model -> Element Msg
 view model =
-    row [ width fill, height fill ] <|
-        [ column [ width fill, alignTop, height fill, scrollbarY ] <|
+    row [ width fill ] <|
+        [ column [ width fill, alignTop, scrollbarY ] <|
             row [ width fill, spacing 5 ]
                 [ EI.button buttonStyle
                     { onPress = Just GetBot
@@ -672,7 +660,7 @@ update msg model =
             , Cmd.none
             )
 
-        CancelBotSelect ->
+        CancelTopDialog ->
             ( { model | dialogs = cdr model.dialogs }, Cmd.none )
 
         SaveBot idx ->
@@ -818,7 +806,7 @@ main =
                             |> Maybe.map
                                 (\x ->
                                     [ inFront
-                                        (infrontDialog CancelBotSelect <|
+                                        (infrontDialog CancelTopDialog <|
                                             x
                                         )
                                     ]
