@@ -16,9 +16,7 @@ import Element.Events as EE
 import Element.Font as Font
 import Element.Input as EI
 import EvalStep exposing (EvalBodyStep(..), NameSpace, Term(..))
-import Html.Attributes as HA
 import Http
-import Json.Encode as JE
 import OkayDialog as OK
 import Prelude as Prelude
 import PublicInterface as PI
@@ -610,7 +608,9 @@ update msg model =
                                     ( { model | dialogs = cdr model.dialogs }, Cmd.none )
 
                                 SSD.Selected name ->
-                                    ( { model | dialogs = cdr model.dialogs }, mkPublicHttpReq model.location (PI.GetScript name) )
+                                    ( { model | dialogs = ndlg :: cdr model.dialogs }
+                                    , mkPublicHttpReq model.location (PI.GetScript name)
+                                    )
 
                         OKCommand oc ->
                             case oc of
